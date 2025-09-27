@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Flexi's Pizza Builder 🍕</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 2rem auto; line-height: 1.6; }
+    .meal { border: 1px solid #ccc; padding: 1rem; margin-bottom: 1.5rem; border-radius: 10px; }
+    img { max-width: 100%; border-radius: 8px; }
+    h2 { margin-top: 0; }
+    .badge { display: inline-block; background: #e0ffe0; padding: 4px 8px; border-radius: 6px; font-size: 13px; margin-bottom: 10px; }
+    label { display: block; margin-top: 8px; }
+    textarea { width: 100%; height: 100px; }
+    input[type="text"] { width: 100%; padding: 5px; }
+    .form-box { border: 2px dashed #aaa; padding: 1rem; border-radius: 10px; margin-bottom: 2rem; }
+    .toggle { margin-bottom: 1rem; }
+    .buttons { margin-top: 1rem; }
+    .buttons button, .buttons a {
+      margin-right: 10px;
+      background: #ff4f4f;
+      color: #fff;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .buttons a { background: #25d366; }
+  </style>
+</head>
+<body>
+  <h1>Custom Pizza App 🍕</h1>
+
+  <div class="form-box">
+    <h2>Edit Your Pizza</h2>
+    <label>Pizza Name: <input type="text" id="pizzaName" value="Flexi’s Extra-Large Vege-Chicken No-Cheese Pizza" /></label>
+
+    <label>Ingredients (one per line, format: quantity - item):</label>
+    <textarea id="pizzaIngredients">500 g - Bread flour
+320 ml - Warm water
+7 g - Instant yeast
+1 tsp - Sugar
+2 tsp - Salt
+2 tbsp - Olive oil
+170 g - Tomato paste
+400 g - Crushed tomatoes
+3 cloves - Garlic
+1 tsp - Dried oregano
+1 tsp - Dried basil
+Small piece - Scotch bonnet (ata rodo)
+250 g - Suya chicken breast
+1 cup - Bell peppers (mixed)
+1 small - Red onion
+1/2 cup - Sweet corn
+1/2 cup - Mushrooms
+1 cup - Spinach
+to taste - Black pepper
+to finish - Olive oil (drizzle)</textarea>
+
+    <label>Instructions:</label>
+    <textarea id="pizzaInstructions">1) Mix warm water, sugar, and yeast. Let bloom.
+2) Combine with flour, salt, oil. Knead & proof.
+3) Make sauce with garlic, tomatoes, herbs.
+4) Add toppings: suya chicken, peppers, spinach, etc.
+5) Bake hot and slice. No cheese needed!</textarea>
+
+    <div class="buttons">
+      <button onclick="exportToPDF()">📄 Export PDF</button>
+      <a href="#" id="whatsappShare" target="_blank">📲 Share on WhatsApp</a>
+    </div>
+  </div>
+
+  <div class="toggle">
+    <label><input type="checkbox" id="nigeriaFriendly" checked onchange="fetchPizzaRecipes()"> Hide foreign/unavailable recipes (Nigeria-friendly)</label>
+  </div>
+
+  <div id="recipes">Loading pizzas...</div>
+  
+  
+  <footer>
+      &copy; 2025 Custom Pizza App Project.  Built With ♥️ by <a href="https://flexi-spec.github.io/Portfolio-/" target="_blank">Flexi Dev Studio</a>
+</footer>
+
+  <script>
+    const blockedIngredients = [
+      'cheese', 'mozzarella', 'parmesan', 'ricotta', 'gorgonzola',
+      'pepperoni', 'anchovy', 'prosciutto', 'bacon', 'salami',
+      'ham', 'caviar', 'artichoke', 'capers', 'clam', 'veal'
+    ];
+
+    let flexiPizza = {};
+
+    function parseFlexiPizza() {
+      const name = document.getElementById('pizzaName').value.trim();
+      const rawIngredients = document.getElementById('pizzaIngredients').value.trim().split('\n');
+      const instructions = document.getElementById('pizzaInstructions').value.trim();
+
+      const pizza = {
+        idMeal: 'FLEXI001',
+        strMeal: name,
+        strCategory: 'Pizza',
+        strArea: 'Fusion (Naija-friendly)',
+        strMealThumb: 'https://www.themealdb.com/images/media/meals/x0lk931587671540.jpg',
+        strInstructions: instructions
+      };
+
+      rawIngredients.forEach((line, i) => {
+        const [qty, item] = line.split('-').map(s => s.trim());
+        pizza[`strIngredient${i + 1}`] = item || '';
+        pizza[`strMeasure${i + 1}`] = qty || '';
+      });
+
+      return pizza;
+    }
+
+    function updateFlexiPizza() {
+      flexiPizza = parseFlexiPizza();
+      fetchPizzaRecipes();
+      updateWhatsAppLink();
+    }
+
+    async function fetchPizzaRecipes() {
+      const res = await fetch('https://www.themealdb.com/api/json/v1/1/search.php?s=pizza');
+      const data = await res.json();
+      flexiPizza = parseFlexiPizza();
+
+      const allMeals = [...(data.meals || []), flexiPizza];
+      const nigeriaOnly = document.getElementById('nigeriaFriendly').checked;
+
+      const filtered = allMeals.filter(meal => {
+        for (let i = 1; i <= 20; i++) {
+          const ing = (meal[`strIngredient${i}`] || '').toLowerCase();
+          if (nigeriaOnly && blockedIngredients.some(bad => ing.includes(bad))) {
+            return false;
+          }
+        }
+        return true;
+      });
+
+      render(filtered);
+    }
+
+    function render(meals) {
+      const container = document.getElementById('recipes');
+      container.innerHTML = '';
+
+      if (!meals.length) {
+        container.textContent = 'No pizza recipes found based on your filter.';
+        return;
+      }
+
+      meals.forEach(meal => {
+        const mealDiv = document.createElement('div');
+        mealDiv.className = 'meal';
+
+        let ingredientsList = '<ul>';
+        for (let i = 1; i <= 20; i++) {
+          const ingredient = meal[`strIngredient${i}`];
+          const measure = meal[`strMeasure${i}`];
+          if (ingredient && ingredient.trim() !== '') {
+            ingredientsList += `<li>${measure || ''} ${ingredient}</li>`;
+          }
+        }
+        ingredientsList += '</ul>';
+
+        const isFlexi = meal.idMeal === 'FLEXI001';
+
+        mealDiv.innerHTML = `
+          ${isFlexi ? '<div class="badge">Custom by Flexi</div>' : ''}
+          <h2>${meal.strMeal}</h2>
+          <img src="${meal.strMealThumb}" alt="${meal.strMeal}" />
+          <p><strong>Category:</strong> ${meal.strCategory || 'N/A'} | <strong>Area:</strong> ${meal.strArea || 'N/A'}</p>
+          <h3>Ingredients:</h3>${ingredientsList}
+          <h3>Instructions:</h3><p style="white-space: pre-wrap">${meal.strInstructions}</p>
+        `;
+        container.appendChild(mealDiv);
+      });
+    }
+
+    function exportToPDF() {
+      const pizza = parseFlexiPizza();
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      let y = 10;
+
+      doc.setFontSize(16);
+      doc.text(pizza.strMeal, 10, y); y += 10;
+
+      doc.setFontSize(12);
+      doc.text("Ingredients:", 10, y); y += 8;
+
+      for (let i = 1; i <= 20; i++) {
+        const ing = pizza[`strIngredient${i}`];
+        const qty = pizza[`strMeasure${i}`];
+        if (ing) {
+          doc.text(`- ${qty} ${ing}`, 10, y);
+          y += 7;
+          if (y > 270) { doc.addPage(); y = 10; }
+        }
+      }
+
+      y += 5;
+      doc.text("Instructions:", 10, y); y += 8;
+
+      const lines = doc.splitTextToSize(pizza.strInstructions, 180);
+      lines.forEach(line => {
+        doc.text(line, 10, y);
+        y += 7;
+        if (y > 270) { doc.addPage(); y = 10; }
+      });
+
+      doc.save(`${pizza.strMeal.replace(/ /g, "_")}.pdf`);
+    }
+
+    function updateWhatsAppLink() {
+      const pizza = parseFlexiPizza();
+      let text = `🍕 *${pizza.strMeal}*\n\n*Ingredients:*\n`;
+
+      for (let i = 1; i <= 20; i++) {
+        const ing = pizza[`strIngredient${i}`];
+        const qty = pizza[`strMeasure${i}`];
+        if (ing) text += `- ${qty} ${ing}\n`;
+      }
+
+      text += `\n*Instructions:*\n${pizza.strInstructions}`;
+      const encoded = encodeURIComponent(text);
+      document.getElementById('whatsappShare').href = `https://wa.me/?text=${encoded}`;
+    }
+
+    updateFlexiPizza();
+  </script>
+</body>
+</html>
